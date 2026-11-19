@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<body>
+<div class="wizard-shell" id="wizard">
+  <section class="wizard-page active" id="step-0">
+    <div class="wizard-header"><h1>محاسبه مستمری بازنشستگی (NIOC)</h1></div>
+    <div class="wizard-nav"><button class="btn btn-primary" onclick="wizardNext()">Next</button></div>
+  </section>
+  <section class="wizard-page" id="step-1">
+    <div class="wizard-card"><div class="wizard-intro">تهیه‌کننده: محمدرضا وکیلی (امور مالی)</div></div>
+    <div class="wizard-nav"><button class="btn btn-outline" onclick="wizardBack()">Back</button><button class="btn btn-primary" onclick="wizardNext()">Next</button></div>
+  </section>
+  <section class="wizard-page" id="step-2">
+    <div class="wizard-card"><div class="wizard-intro">استاد راهنما: حسین ابوالحسن زاده</div></div>
+    <div class="wizard-nav"><button class="btn btn-outline" onclick="wizardBack()">Back</button><button class="btn btn-primary" onclick="wizardNext()">Next</button></div>
+  </section>
+  <section class="wizard-page" id="step-3"><div class="wizard-card"><h2 id="wizardLabel"></h2><div id="wizardInput"></div></div><div class="wizard-nav"><button class="btn btn-outline" onclick="wizardBack()">Back</button><button class="btn btn-primary" onclick="wizardNext()">Next</button></div></section>
+  <section class="wizard-page" id="step-calc"><div class="wizard-card"><h2>اطلاعات تکمیل شد</h2><p>برای محاسبه مستمری، دکمه زیر را بزنید.</p><div class="wizard-nav"><button class="btn btn-outline" onclick="wizardBack()">Back</button><button class="btn btn-success" onclick="wizardCalculate()">محاسبه</button></div></div></section>
+  <section class="wizard-page" id="step-result"><div class="wizard-card"><h2>نتیجه محاسبه</h2><div class="result-box"><div class="label">مستمری متعلقه (ریال)</div><div class="value" id="wizardPension">—</div></div><div class="wizard-nav"><button class="btn btn-outline" onclick="wizardBack()">Back</button></div></div></section>
+</div>
+<div id="engine" style="display:none">
+<div class="card">
+  <h2>اطلاعات ورودی</h2>
+  <div class="row">
+<div>
+      <label>تاریخ استخدام (شمسی)</label>
+      <input type="text" id="hire_date" value="1371/12/08" placeholder="1371/12/08" inputmode="numeric">
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label>تاریخ پایان خدمت / بازنشستگی</label>
+      <input type="text" id="retirement_date" value="1406/03/31" placeholder="1406/03/31" inputmode="numeric">
+    </div>
+    <div>
+      <label>تاریخ آخرین ترفیع</label>
+      <input type="text" id="last_promotion_date" value="1403/12/08" placeholder="1403/12/08" inputmode="numeric">
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label>پایه حقوق جاری سال قبل (۱۴۰۵)</label>
+      <input type="number" id="base_salary_1405" value="42200000" step="1">
+    </div>
+    <div>
+      <label>پایه حقوق دو سال قبل (۱۴۰۴)</label>
+      <input type="number" id="base_salary_1404" value="32200000" step="1">
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label>تعداد سال خرید خدمت (سربازی و غیره)</label>
+      <input type="number" id="purchased_years" value="2" step="0.1" min="0">
+    </div>
+    <div>
+      <label>درصد ویژه</label>
+      <input type="number" id="special_percent" value="30" step="0.1">
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label>درصد کارگاهی</label>
+      <input type="number" id="workshop_percent" value="10" step="0.1">
+    </div>
+    <div>
+      <label>نوع پایه سمت</label>
+      <select id="position_type">
+        <option value="11">۱۱ تا ۱۵ (۸٪)</option>
+        <option value="16">۱۶ (۱۵٪)</option>
+        <option value="17">۱۷ (۲۰٪)</option>
+        <option value="A">A (۲۵٪)</option>
+        <option value="B">B (۳۵٪)</option>
+        <option value="C" selected>C (۵۰٪)</option>
+        <option value="D">D (۶۰٪)</option>
+      </select>
+    </div>
+  </div>
+  <div>
+    <label>مدرک تحصیلی</label>
+    <select id="education_type">
+      <option value="دیپلم">دیپلم (۱۷٫۵٪)</option>
+      <option value="فوق دیپلم">فوق دیپلم (۲۷٪)</option>
+      <option value="لیسانس" selected>لیسانس (۳۸٫۵٪)</option>
+      <option value="فوق لیسانس">فوق لیسانس (۴۶٫۲٪)</option>
+      <option value="دکترا">دکترا (۵۴٪)</option>
+    </select>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+// ===================== Jalali conversion (same algorithm as backend) =====================
+function jalaliToGregorian(jy, jm, jd) {
+  jy += 1595;
+  let days = -355668 + 365 * jy + Math.floor(jy / 33) * 8 + Math.floor((jy % 33 + 3) / 4) + jd;
+  if (jm < 7) days += (jm - 1) * 31;
+  else days += (jm - 7) * 30 + 186;
+  let gy = 400 * Math.floor(days / 146097);
+  days %= 146097;
+  if (days > 36524) {
+    gy += 100 * Math.floor((days - 1) / 36524);
+    days = (days - 1) % 36524;
+    if (days >= 365) { gy += Math.floor(days / 365); days %= 365; }
+  }
+  gy += 4 * Math.floor(days / 1461);
+  days %= 1461;
+  if (days > 365) { gy += Math.floor((days - 1) / 365); days = (days - 1) % 365; }
+  let gd = days + 1;
+  const leap = (gy % 4 === 0 && gy % 100 !== 0) || gy % 400 === 0;
+  const md = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  let gm = 1;
+  while (gm <= 12 && gd > md[gm - 1]) { gd -= md[gm - 1]; gm++; }
+  return new Date(gy, gm - 1, gd);
+}
+
+function parseJalali(s) {
+  const p = s.trim().replace(/-/g, '/').split('/');
+  if (p.length !== 3) throw new Error('تاریخ نامعتبر');
+  return [parseInt(p[0],10), parseInt(p[1],10), parseInt(p[2],10)];
+}
+
+function daysBetween(start, end) {
+  const d1 = jalaliToGregorian(...start);
+  const d2 = jalaliToGregorian(...end);
+  return Math.round((d2 - d1) / 86400000);
+}
+
+// ===================== Exact calculator (matches Excel) =====================
+const PROMOTION_FULL = 5.0;
+const PROMOTION_DAYS = 1095;
+const MULT = 1.325;
+const ATTR_BASE = 8 * 1.3; // 10.4
+const POS_RATES = { "11":8,"12":8,"13":8,"14":8,"15":8,"16":15,"17":20,"A":25,"B":35,"C":50,"D":60 };
+const EDU_RATES = { "دیپلم":17.5,"فوق دیپلم":27,"لیسانس":38.5,"فوق لیسانس":46.2,"دکترا":54 };
+
+function durationYears(start, end) {
+  const [y1,m1,d1] = start, [y2,m2,d2] = end;
+  let years = y2 - y1, months = m2 - m1, days = d2 - d1;
+  if (days < 0) { months -= 1; days += 30; }
+  if (months < 0) { years -= 1; months += 12; }
+  return years + months / 12 + days / 365.25;
+}
+function yearsSimple(start, end) { return durationYears(start, end); }
+
+function calculate(data) {
+  const hire = parseJalali(data.hire_date);
+  const retire = parseJalali(data.retirement_date);
+  const promo = parseJalali(data.last_promotion_date);
+
+  // 1. Promotion
+  const elapsed = Math.max(0, daysBetween(promo, retire));
+  const promoDue = elapsed * PROMOTION_FULL / PROMOTION_DAYS;
+
+  // 2. 24-month
+  const base1405 = +data.base_salary_1405;
+  const base1404 = +data.base_salary_1404;
+  const [, retireM] = retire;
+  const monthsFinal = retireM;
+  const monthsY2 = Math.max(0, 24 - monthsFinal - 12);
+
+  const salaryBefore = base1405 * (monthsFinal - 1) * MULT;
+  const lastMonth = (base1405 + base1405 * promoDue / 100) * MULT;
+  const totalFinal = salaryBefore + lastMonth;
+  const totalPrev = base1405 * 12;
+  const totalY2 = base1404 * monthsY2;
+  const total24 = totalFinal + totalPrev + totalY2;
+  const avg24 = total24 / 24;
+
+  // 3. Service years: date-based duration (months are twelfths of a year)
+  const companyYears = durationYears(hire, retire);
+  const purchased = +data.purchased_years;
+  const totalService = companyYears + purchased;
+  const finalAvg = avg24 * totalService / 30;
+
+  // 4. Percents
+  const special = +data.special_percent;
+  const workshop = +data.workshop_percent;
+
+  const attrYears = durationYears([1381,1,1], retire);
+  const attrDue = ATTR_BASE * attrYears / 30;
+
+  const posType = data.position_type;
+  const posRate = POS_RATES[posType] || 50;
+  const posPct = posRate * 1.3;
+  const posYears = durationYears([1392,1,1], retire);
+  const posDue = posYears * posPct / 30;
+
+  const eduType = data.education_type;
+  const eduRate = EDU_RATES[eduType] || 38.5;
+  const eduPct = eduRate * 1.3;
+  const eduYears = durationYears([1392,11,13], retire);
+  const degDue = eduYears * eduPct / 30;
+
+  const totalPct = special + workshop + attrDue + posDue + degDue;
+  const pension = finalAvg * (1 + totalPct / 100);
+
+  return {
+    elapsed, promoDue, monthsFinal, monthsY2,
+    salaryBefore, lastMonth, totalFinal, totalPrev, totalY2, total24, avg24,
+    companyYears, purchased, totalService, finalAvg,
+    special, workshop, attrYears, attrDue,
+    posType, posRate, posPct, posYears, posDue,
+    eduType, eduRate, eduPct, eduYears, degDue,
+    totalPct, pension
+  };
+}
+
+// ===================== UI =====================
+function fmt(n, dig=0) {
+  if (n == null || isNaN(n)) return '—';
+  return Number(n).toLocaleString('fa-IR', { maximumFractionDigits: dig, minimumFractionDigits: dig });
+}
+
+function getData() {
+  return {
+    hire_date: document.getElementById('hire_date').value,
+    retirement_date: document.getElementById('retirement_date').value,
+    last_promotion_date: document.getElementById('last_promotion_date').value,
+    base_salary_1405: document.getElementById('base_salary_1405').value,
+    base_salary_1404: document.getElementById('base_salary_1404').value,
+    purchased_years: document.getElementById('purchased_years').value,
+    special_percent: document.getElementById('special_percent').value,
+    workshop_percent: document.getElementById('workshop_percent').value,
+    position_type: document.getElementById('position_type').value,
+    education_type: document.getElementById('education_type').value
+  };
+}
+
+let lastResult = null;
+
+function doCalculate() {
+  try {
+    const data = getData();
+    lastResult = calculate(data);
+    document.getElementById('finalPension').textContent = fmt(lastResult.pension, 0) + ' ریال';
+    renderDetails(lastResult);
+    toast('محاسبه با موفقیت انجام شد');
+  } catch (e) {
+    toast('خطا: ' + e.message);
+    console.error(e);
+  }
+}
+
+function renderDetails(r) {
+  const html = `
+  <table>
+    <tr><th colspan="2">ترفیع</th></tr>
+    <tr><td>روزهای سپری‌شده از آخرین ترفیع</td><td class="num">${fmt(r.elapsed)}</td></tr>
+    <tr><td>روز لازم برای ترفیع کامل</td><td class="num">۱۰۹۵</td></tr>
+    <tr><td>درصد ترفیع متعلقه</td><td class="num">${fmt(r.promoDue, 6)}</td></tr>
+    <tr><th colspan="2">میانگین ۲۴ ماه</th></tr>
+    <tr><td>حقوق ماه‌های قبل از آخرین ماه (سال پایانی)</td><td class="num">${fmt(r.salaryBefore, 2)}</td></tr>
+    <tr><td>حقوق آخرین ماه اشتغال</td><td class="num">${fmt(r.lastMonth, 2)}</td></tr>
+    <tr><td>جمع حقوق سال پایانی</td><td class="num">${fmt(r.totalFinal, 2)}</td></tr>
+    <tr><td>جمع حقوق سال قبل</td><td class="num">${fmt(r.totalPrev, 0)}</td></tr>
+    <tr><td>جمع حقوق دو سال قبل</td><td class="num">${fmt(r.totalY2, 0)}</td></tr>
+    <tr><td>جمع کل ۲۴ ماه</td><td class="num">${fmt(r.total24, 2)}</td></tr>
+    <tr><td>میانگین ۲۴ ماه</td><td class="num">${fmt(r.avg24, 2)}</td></tr>
+    <tr><th colspan="2">سابقه خدمت</th></tr>
+    <tr><td>سابقه شرکت (سال)</td><td class="num">${fmt(r.companyYears, 2)}</td></tr>
+    <tr><td>خرید خدمت / سربازی</td><td class="num">${fmt(r.purchased, 2)}</td></tr>
+    <tr><td>کل سابقه</td><td class="num">${fmt(r.totalService, 2)}</td></tr>
+    <tr><td>میانگین نهایی (بر اساس سابقه)</td><td class="num">${fmt(r.finalAvg, 2)}</td></tr>
+    <tr><th colspan="2">درصدهای مؤثر</th></tr>
+    <tr><td>ویژه</td><td class="num">${fmt(r.special, 2)}</td></tr>
+    <tr><td>کارگاهی</td><td class="num">${fmt(r.workshop, 2)}</td></tr>
+    <tr><td>جذب متعلقه (سال ${fmt(r.attrYears,2)})</td><td class="num">${fmt(r.attrDue, 6)}</td></tr>
+    <tr><td>سمت متعلقه (${r.posType} – سال ${fmt(r.posYears,2)})</td><td class="num">${fmt(r.posDue, 6)}</td></tr>
+    <tr><td>مدرک متعلقه (${r.eduType} – سال ${fmt(r.eduYears,2)})</td><td class="num">${fmt(r.degDue, 6)}</td></tr>
+    <tr><td><b>جمع درصدها</b></td><td class="num"><b>${fmt(r.totalPct, 4)}</b></td></tr>
+    <tr><th colspan="2">نتیجه نهایی</th></tr>
+    <tr><td><b>مستمری متعلقه</b></td><td class="num"><b>${fmt(r.pension, 2)}</b></td></tr>
+  </table>`;
+  const target = document.getElementById('detailsContent');
+  if (target) target.innerHTML = html;
+}
+
+function toggleAdmin() {
+  document.getElementById('adminPanel').classList.toggle('visible');
+}
+
+// ===================== Storage =====================
+const STORAGE_KEY = 'pension_cases_v1';
+
+function saveCase() {
+  const data = getData();
+  if (!lastResult) doCalculate();
+  const cases = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const entry = { ...data, result: lastResult, savedAt: new Date().toISOString() };
+  const idx = cases.findIndex(c => c.case_name === data.case_name);
+  if (idx >= 0) cases[idx] = entry;
+  else cases.push(entry);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(cases));
+  toast('پرونده ذخیره شد');
+}
+
+function loadCases() {
+  const cases = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const list = document.getElementById('caseList');
+  const card = document.getElementById('casesCard');
+  if (!cases.length) { toast('پرونده‌ای ذخیره نشده'); card.style.display='none'; return; }
+  list.innerHTML = cases.map((c,i) =>
+    `<li onclick="loadCase(${i})">
+      <span>${c.case_name || 'بدون نام'} <span class="badge">${c.retirement_date}</span></span>
+      <span class="num">${c.result ? fmt(c.result.pension,0) : '—'}</span>
+    </li>`).join('');
+  card.style.display = 'block';
+}
+
+function loadCase(i) {
+  const cases = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const c = cases[i];
+  if (!c) return;
+    document.getElementById('hire_date').value = c.hire_date;
+  document.getElementById('retirement_date').value = c.retirement_date;
+  document.getElementById('last_promotion_date').value = c.last_promotion_date;
+  document.getElementById('base_salary_1405').value = c.base_salary_1405;
+  document.getElementById('base_salary_1404').value = c.base_salary_1404;
+  document.getElementById('purchased_years').value = c.purchased_years;
+  document.getElementById('special_percent').value = c.special_percent;
+  document.getElementById('workshop_percent').value = c.workshop_percent;
+  document.getElementById('position_type').value = c.position_type;
+  document.getElementById('education_type').value = c.education_type;
+  doCalculate();
+  document.getElementById('casesCard').style.display = 'none';
+  toast('پرونده بارگذاری شد');
+}
+
+function clearAllCases() {
+  if (confirm('همه پرونده‌ها حذف شوند؟')) {
+    localStorage.removeItem(STORAGE_KEY);
+    document.getElementById('casesCard').style.display = 'none';
+    toast('همه پرونده‌ها حذف شدند');
+  }
+}
+
+function exportCSV() {
+  if (!lastResult) doCalculate();
+  const r = lastResult;
+  const d = getData();
+  const rows = [
+    ['نام پرونده', d.case_name],
+    ['تاریخ استخدام', d.hire_date],
+    ['تاریخ پایان خدمت', d.retirement_date],
+    ['تاریخ آخرین ترفیع', d.last_promotion_date],
+    ['پایه حقوق ۱۴۰۵', d.base_salary_1405],
+    ['پایه حقوق ۱۴۰۴', d.base_salary_1404],
+    ['خرید خدمت', d.purchased_years],
+    ['درصد ویژه', d.special_percent],
+    ['درصد کارگاهی', d.workshop_percent],
+    ['نوع سمت', d.position_type],
+    ['مدرک', d.education_type],
+    [],
+    ['درصد ترفیع متعلقه', r.promoDue],
+    ['میانگین ۲۴ ماه', r.avg24],
+    ['سابقه شرکت', r.companyYears],
+    ['کل سابقه', r.totalService],
+    ['میانگین نهایی', r.finalAvg],
+    ['جمع درصدها', r.totalPct],
+    ['مستمری متعلقه', r.pension]
+  ];
+  const csv = rows.map(row => row.map(c => `"${c}"`).join(',')).join('\n');
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'pension.csv';
+  a.click();
+  toast('فایل CSV دانلود شد (قابل باز شدن در Excel)');
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2500);
+}
+
+// Auto-calculate on load with sample
+window.onload = () => {}; 
+
+// Auto recalc on change of inputs
+// Wizard controls drive the hidden calculation inputs.
+</script>
+</div>
+<script>
+const wizardFields=[
+ ['hire_date','تاریخ استخدام (شمسی)'],
+ ['retirement_date','تاریخ پایان خدمت / بازنشستگی'],
+ ['last_promotion_date','تاریخ آخرین ترفیع'],
+ ['base_salary_1405','پایه حقوق جاری سال قبل (۱۴۰۵)'],
+ ['base_salary_1404','پایه حقوق دو سال قبل (۱۴۰۴)'],
+ ['purchased_years','تعداد سال خرید خدمت (سربازی و غیره)'],
+ ['special_percent','درصد ویژه'],
+ ['workshop_percent','درصد کارگاهی'],
+ ['position_type','نوع پایه سمت'],
+ ['education_type','مدرک تحصیلی']
+];
+let wizardIndex=-1;
+let wizardCurrent=0;
+function showWizard(id){document.querySelectorAll('.wizard-page').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');window.scrollTo(0,0)}
+
+function attachJalaliMask(el){if(!el || !['hire_date','retirement_date','last_promotion_date'].some(id=>el.id.endsWith(id)))return;el.addEventListener('input',()=>{const digits=el.value.replace(/\D/g,'').slice(0,8);let v=digits;if(digits.length>4)v=digits.slice(0,4)+'/'+digits.slice(4);if(digits.length>6)v=digits.slice(0,4)+'/'+digits.slice(4,6)+'/'+digits.slice(6);el.value=v;});}
+function showField(){const [id,label]=wizardFields[wizardIndex];const source=document.getElementById(id);const host=document.getElementById('wizardInput');host.innerHTML='';document.getElementById('wizardLabel').textContent=label;const clone=source.cloneNode(true);clone.id='wizard_'+id;clone.style.display='block';clone.style.marginTop='12px';attachJalaliMask(clone);clone.addEventListener('input',()=>{source.value=clone.value});clone.addEventListener('change',()=>{source.value=clone.value});host.appendChild(clone);showWizard('step-3')}
+function wizardNext(){if(wizardIndex<0){wizardIndex=0;showField();return}const [id]=wizardFields[wizardIndex];const v=document.getElementById('wizard_'+id).value;document.getElementById(id).value=v;if(!v.trim()){toast('لطفاً این قسمت را تکمیل کنید');return}if(wizardIndex<wizardFields.length-1){wizardIndex++;showField()}else showWizard('step-calc')}
+function wizardBack(){if(document.getElementById('step-result').classList.contains('active')){showWizard('step-calc');return}if(document.getElementById('step-calc').classList.contains('active')){wizardIndex=wizardFields.length-1;showField();return}if(wizardIndex>0){wizardIndex--;showField();return}if(wizardIndex===0){wizardIndex=-1;showWizard('step-2');return}if(document.getElementById('step-2').classList.contains('active'))showWizard('step-1');else if(document.getElementById('step-1').classList.contains('active'))showWizard('step-0')}
+function wizardCalculate(){try{wizardFields.forEach(([id])=>{const el=document.getElementById('wizard_'+id);if(el)document.getElementById(id).value=el.value});doCalculate();if(!lastResult)return;document.getElementById('wizardPension').textContent=fmt(lastResult.pension,0)+' ریال';showWizard('step-result')}catch(e){toast('خطا: '+e.message)}}
+// Make the calculator engine silent about removed admin details.
+</script>
+</body>
